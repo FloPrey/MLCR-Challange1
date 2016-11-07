@@ -43,5 +43,8 @@ class Analyzer(object):
         numerical_labels = [self.repository.locations.keys().index(tuple(l)) for
                             l in self.y_train]
 
+        print(numerical_labels)
+
         # Convert back to coordinate labels
-        coordinate_labels = [repository.locations.keys()[i] for i in c_output]
+        coordinate_labels = [self.repository.locations.keys()[i] for i in self.y_train]
+        print(coordinate_labels)
