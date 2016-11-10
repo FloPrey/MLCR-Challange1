@@ -8,6 +8,7 @@ from sklearn.cross_validation import ShuffleSplit
 from sklearn.grid_search import GridSearchCV
 from sklearn import neighbors, datasets
 from sklearn.mixture import BayesianGaussianMixture
+from sklearn.naive_bayes import GaussianNB
 
 class Analyzer(object):
     def loadData(self):
@@ -35,11 +36,19 @@ class Analyzer(object):
         #Anzahl an Nachbarn die verwendet werden.
         n_neighbors = 15
 
+        algorithm = 'auto'
+        #algorithm = 'ball_tree'
+        #algorithm = 'kd_tree'
+        #algorithm = 'brute'
+
         #Mit unterschiedlichen Gewichtungen klassifizieren
+        #weight function used in prediction. Possible values:
+        #‘uniform’ : uniform weights. All points in each neighborhood are weighted equally.
+        #‘distance’ : weight points by the inverse of their distance. in this case, closer neighbors of a query point will have a greater influence than neighbors which are further away.
         for weights in ['uniform', 'distance']:
 
             #Classifier erzeugen
-            clf = neighbors.KNeighborsClassifier(n_neighbors, weights=weights)
+            clf = neighbors.KNeighborsClassifier(n_neighbors, weights=weights, algorithm=algorithm)
 
             #training
             clf.fit(self.X_train, [self.repository.locations.keys().index(tuple(l)) for
@@ -54,14 +63,43 @@ class Analyzer(object):
 
     def classifyBayesGausch(self):
 
-        #Anzahl an Nachbarn die verwendet werden.
-        n_components = 15
+        #The number of mixture components. Depending on the data and the value of the weight_concentration_prior the model can decide to not use all the components by setting some component weights_ to values very close to zero. The number of effective components is therefore smaller than n_components.
+        n_components = 1
 
-        clf = BayesianGaussianMixture(n_components=n_components)
+        covariance_type = 'full'
+        #covariance_type = 'tied'
+        #covariance_type = 'diag'
+        #covariance_type = 'spherical'
+
+        #The number of initializations to perform. The result with the highest lower bound value on the likelihood is kept.
+        n_init = 1
+
+        #The method used to initialize the weights, the means and the covariances
+        init_params = 'kmeans'
+        #init_params = 'random'
+
+        clf = BayesianGaussianMixture(n_components=n_components, covariance_type=covariance_type, n_init=n_init, init_params=init_params)
 
         #training
         clf.fit(self.X_train, [self.repository.locations.keys().index(tuple(l)) for
                              l in self.y_train])
+
+        #testing
+        predict = clf.score(self.X_test, [self.repository.locations.keys().index(tuple(l)) for
+                              l in self.y_test])
+
+        print predict
+
+    def classifyNaiveBayes(self):
+
+        #classifier
+        clf = GaussianNB()
+
+        weight = np.full((len(self.X_train), 1), 10, dtype=np.int)
+
+        #training
+        clf.fit(self.X_train, [self.repository.locations.keys().index(tuple(l)) for
+                             l in self.y_train], weight)
 
         #testing
         predict = clf.score(self.X_test, [self.repository.locations.keys().index(tuple(l)) for
