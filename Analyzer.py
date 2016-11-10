@@ -30,13 +30,21 @@ class Analyzer(object):
                                random_state=0)
 
     def classifyKNearest(self):
+
+        #Anzahl an Nachbarn die verwendet werden.
         n_neighbors = 15
 
+        #Mit unterschiedlichen Gewichtungen klassifizieren
         for weights in ['uniform', 'distance']:
 
+            #Classifier erzeugen
             clf = neighbors.KNeighborsClassifier(n_neighbors, weights=weights)
+
+            #training
             clf.fit(self.X_train, [self.repository.locations.keys().index(tuple(l)) for
                                  l in self.y_train])
+
+            #testing
             predict = clf.score(self.X_test, [self.repository.locations.keys().index(tuple(l)) for
                                   l in self.y_test])
 
