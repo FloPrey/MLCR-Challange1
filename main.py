@@ -2,5 +2,9 @@ from Analyzer import Analyzer
 
 analyzer = Analyzer()
 
-analyzer.learning()
+analyzer.loadData()
+analyzer.improveData()
+analyzer.splitData()
+analyzer.classifyKNearest()
+analyzer.classifySVC()
 analyzer.convert()
