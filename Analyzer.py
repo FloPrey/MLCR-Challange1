@@ -7,6 +7,7 @@ from sklearn.svm import SVC
 from sklearn.cross_validation import ShuffleSplit
 from sklearn.grid_search import GridSearchCV
 from sklearn import neighbors, datasets
+from sklearn.mixture import BayesianGaussianMixture
 
 class Analyzer(object):
     def loadData(self):
@@ -49,6 +50,24 @@ class Analyzer(object):
                                   l in self.y_test])
 
             print predict
+
+
+    def classifyBayesGausch(self):
+
+        #Anzahl an Nachbarn die verwendet werden.
+        n_components = 15
+
+        clf = BayesianGaussianMixture(n_components=n_components)
+
+        #training
+        clf.fit(self.X_train, [self.repository.locations.keys().index(tuple(l)) for
+                             l in self.y_train])
+
+        #testing
+        predict = clf.score(self.X_test, [self.repository.locations.keys().index(tuple(l)) for
+                              l in self.y_test])
+
+        print predict
 
     def classifySVC(self):
         # Define the classifier to use
