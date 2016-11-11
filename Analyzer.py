@@ -2,10 +2,11 @@ from repository import Repository
 from configuration import config
 
 import numpy as np
-from sklearn.cross_validation import train_test_split
+import pandas as pd
+from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
-from sklearn.cross_validation import ShuffleSplit
-from sklearn.grid_search import GridSearchCV
+from sklearn.model_selection import ShuffleSplit
+from sklearn.model_selection import GridSearchCV
 from sklearn import neighbors, datasets
 from sklearn.mixture import BayesianGaussianMixture
 from sklearn.naive_bayes import GaussianNB
@@ -14,6 +15,7 @@ import math
 
 class Analyzer(object):
     
+    #pd.options.mode.chained_assignment = None
     
     """Method that loads the datapoints from the repository and transfers them into lists and
     numpy arrays."""
@@ -45,6 +47,35 @@ class Analyzer(object):
         
         self.numericalFloorLabels = self.createNumericalFloorLebels(floorList)
         
+        self.improveData()
+        
+        self.dataset['floorLabel'] = self.floorLabels
+        self.dataset['numericalFloorLabels'] = self.numericalFloorLabels
+        self.dataset['numericalLocationLabel'] = self.numerical_labels
+        
+        split = np.random.rand(len(self.dataset)) < 0.9
+        
+        datasetCopy=self.dataset.copy()
+        
+        firstSet = datasetCopy[split]
+        secondSet = datasetCopy[~split]
+        
+        self.trainAndTestSet = firstSet.copy()
+        self.validationSet = secondSet.copy()
+        
+        # test and train labels
+        self.floorLabel_T = self.trainAndTestSet['floorLabel'].tolist()
+        self.numericalFloorLabel_T = self.trainAndTestSet['numericalFloorLabels'].tolist()
+        self.numericalLabel_T = self.trainAndTestSet['numericalLocationLabel'].tolist()
+        
+        # validation labels
+        self.floorLabel_V = self.validationSet['floorLabel'].tolist()
+        self.numericalFloorLabel_V = self.validationSet['numericalFloorLabels'].tolist()
+        self.numericalLabel_V = self.validationSet['numericalLocationLabel'].tolist()
+        
+        self.trainAndTestSet.drop(['floorLabel','numericalFloorLabels','numericalLocationLabel'], axis=1, inplace=True)
+        self.validationSet.drop(['floorLabel','numericalFloorLabels','numericalLocationLabel'], axis=1, inplace=True)
+        
     """Helper Method to change the String values of the floor string labels into numerical values."""    
     def createNumericalFloorLebels(self, floorList):
         
@@ -68,34 +99,21 @@ class Analyzer(object):
     def splitData(self, x_values, y_values):
         
         X_train, X_test, y_train, y_test = train_test_split(x_values, y_values, test_size=0.1)
-
-
-        self.cv = ShuffleSplit(X_train.shape[0], n_iter=10, test_size=0.2,
-                               random_state=0)
         
         return X_train, X_test, y_train, y_test
-
-
 
     """Method to train a classifier to learn to predict the floor of the given datapoints."""
     def predictFloor(self):
         
-        X_train, X_test, y_train, y_test = self.splitData(self.dataset, self.floorLabels)
-        
-        # save the testset globally to use again later for location prediction
-        self.X_dataset = X_test
-        self.y_dataset = y_test
+        # create test set
+        X_train, X_test, y_train, y_test = self.splitData(self.trainAndTestSet, self.floorLabel_T)   
         
         print "Starting training process for the Floor Prediction!"
         print "------------------------------------"
         
         classifier = self.classifyRandomForest(X_train, X_test, y_train, y_test)
         
-        self.floorPrediction = classifier.predict(self.X_dataset)
-        
-        print "Floors that have been predicted:"
-        print self.floorPrediction
-        print "------------------------------------"
+        self.floorPrediction = classifier.predict(self.validationSet)
         
         
     """This method predicts the location of the previously loaded dataset. 
@@ -105,10 +123,9 @@ class Analyzer(object):
     def predictLocation(self):
         
         # add true floor labels to the dataset for training
-        self.dataset['floorLabels'] = self.numericalFloorLabels
+        self.trainAndTestSet['floorLabels'] = self.numericalFloorLabel_T
         
-        # split dataset into train and test sets
-        X_train, X_test, y_train, y_test = self.splitData(self.dataset, self.numerical_labels)
+        X_train, X_test, y_train, y_test = self.splitData(self.trainAndTestSet, self.numericalLabel_T)
         
         print "Starting training process for the Location Prediction!"
         print "------------------------------------"
@@ -117,14 +134,10 @@ class Analyzer(object):
         classifier = self.classifyRandomForest(X_train, X_test, y_train, y_test)
         
         # add predicted floor labels to the dataset
-        self.X_dataset['floorLabels'] = self.createNumericalFloorLebels(self.floorPrediction)
+        self.validationSet['floorLabels'] = self.createNumericalFloorLebels(self.floorPrediction)
         
         # predict the locations usind the dataset, but with predicted labels instead
-        self.locationPrediction = classifier.predict(self.X_dataset)
-        
-        print "Locations that have been predicted:"
-        print self.locationPrediction
-        print "------------------------------------"
+        self.locationPrediction = classifier.predict(self.validationSet)
         
         self.errorValue = self.calculateAverageLocationError()
         
@@ -139,9 +152,10 @@ class Analyzer(object):
         
         # transform the predicted location labels back to coordinates
         predictedCoordinate_labels = [self.repository.locations.keys()[i] for i in self.locationPrediction]
+        groundTruth = [self.repository.locations.keys()[i] for i in self.numericalLabel_V]
         
         # transform the numpy array into a list of tupels
-        labelList = tuple(map(tuple, self.labels))
+        labelList = tuple(map(tuple, groundTruth))
         
         # create a list of tupels containing all the missclassified locations and their actual coordinates
         errorList = []
@@ -258,6 +272,10 @@ class Analyzer(object):
         return clf
 
     def classifySVC(self, X_train, X_test, y_train, y_test):
+        
+        self.cv = ShuffleSplit(X_train.shape[0], n_iter=10, test_size=0.2,
+                               random_state=0)
+        
         # Define the classifier to use
         estimator = SVC(kernel='linear')
 
@@ -277,7 +295,6 @@ class Analyzer(object):
         print "------------------------------------"
         return clf
 
-    
     """Method to calculate the difference between to coordinates in meter."""
     def calculateError(self, tuple1, tuple2):
         
