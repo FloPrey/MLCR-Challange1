@@ -103,11 +103,11 @@ class Analyzer(object):
 
         filename = "optimized-dataset-" + str(percentage_value) +".csv"
         if os.path.isfile(filename):
-            print ("optimised Dataset found with ", percentage_value, "% . Create new one? [y/n]")
+            print "optimised Dataset found with ", percentage_value, "% . Create new one? [y/n]"
             input = raw_input()
             if input == "n":
                 print "loading existing optimised Dataset"
-                self.dataset = pd.read_csv(filename, sep='\t')
+                self.dataset = pd.read_csv(filename, sep='\t', header=0, index_col=0, encoding="UTF-8")
                 print "dataset size: ", self.dataset.shape
                 return
 
