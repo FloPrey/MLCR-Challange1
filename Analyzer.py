@@ -12,6 +12,8 @@ from sklearn import neighbors, datasets
 from sklearn.mixture import BayesianGaussianMixture
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import precision_recall_fscore_support
+from sklearn.metrics import confusion_matrix
 import math
 
 class Analyzer(object):
@@ -63,21 +65,24 @@ class Analyzer(object):
         firstSet = datasetCopy[split]
         secondSet = datasetCopy[~split]
         
-        self.trainAndTestSet = firstSet.copy()
-        self.validationSet = secondSet.copy()
+        # input train and validation set
+        self.trainAndValidationSet = firstSet.copy()
         
-        # test and train labels
-        self.floorLabel_T = self.trainAndTestSet['floorLabel'].tolist()
-        self.numericalFloorLabel_T = self.trainAndTestSet['numericalFloorLabels'].tolist()
-        self.numericalLabel_T = self.trainAndTestSet['numericalLocationLabel'].tolist()
+        # input test set
+        self.testSet = secondSet.copy()
         
-        # validation labels
-        self.floorLabel_V = self.validationSet['floorLabel'].tolist()
-        self.numericalFloorLabel_V = self.validationSet['numericalFloorLabels'].tolist()
-        self.numericalLabel_V = self.validationSet['numericalLocationLabel'].tolist()
+        # test and evaluation labels
+        self.floorLabel_T = self.trainAndValidationSet['floorLabel'].tolist()
+        self.numericalFloorLabel_T = self.trainAndValidationSet['numericalFloorLabels'].tolist()
+        self.numericalLabel_T = self.trainAndValidationSet['numericalLocationLabel'].tolist()
         
-        self.trainAndTestSet.drop(['floorLabel', 'numericalFloorLabels', 'numericalLocationLabel'], axis=1, inplace=True)
-        self.validationSet.drop(['floorLabel', 'numericalFloorLabels', 'numericalLocationLabel'], axis=1, inplace=True)
+        # labels for the testing
+        self.floorLabel_Test = self.testSet['floorLabel'].tolist()
+        self.numericalFloorLabel_Test = self.testSet['numericalFloorLabels'].tolist()
+        self.numericalLocationLabel_Test = self.testSet['numericalLocationLabel'].tolist()
+        
+        self.trainAndValidationSet.drop(['floorLabel', 'numericalFloorLabels', 'numericalLocationLabel'], axis=1, inplace=True)
+        self.testSet.drop(['floorLabel', 'numericalFloorLabels', 'numericalLocationLabel'], axis=1, inplace=True)
         
     """Helper Method to change the String values of the floor string labels into numerical values."""    
     def createNumericalFloorLabels(self, floorList):
@@ -209,15 +214,22 @@ class Analyzer(object):
     """Method to train a classifier to learn to predict the floor of the given datapoints."""
     def predictFloor(self):
         
-        # create test set
-        X_train, X_test, y_train, y_test = self.splitData(self.trainAndTestSet, self.floorLabel_T)   
+        # split the trainAndValidationSet into a training and a validation set
+        X_train, X_test, y_train, y_test = self.splitData(self.trainAndValidationSet, self.floorLabel_T)   
         
         print "Starting training process for the Floor Prediction!"
         print "------------------------------------"
         
+        # train the chosen classifier
         classifier = self.classifyRandomForest(X_train, X_test, y_train, y_test)
         
-        self.floorPrediction = classifier.predict(self.validationSet)
+        # perform the actual prediction using the test set
+        self.floorPrediction = classifier.predict(self.testSet)
+        
+        print "The Confusion Matrix, Precision, Recall and F1 score for the floor prediction classifier:"
+        print confusion_matrix(self.floorLabel_Test, self.floorPrediction)
+        print precision_recall_fscore_support(self.floorLabel_Test, self.floorPrediction, average='macro')
+        print "------------------------------------"
         
         
     """This method predicts the location of the previously loaded dataset. 
@@ -226,27 +238,32 @@ class Analyzer(object):
     prediction we use the previously predicted floors from the predictFloor method."""    
     def predictLocation(self):
         
-        # add true floor labels to the dataset for training
-        self.trainAndTestSet['floorLabels'] = self.numericalFloorLabel_T
+        # add floor labels to the train and validation set for training/validation
+        self.trainAndValidationSet['floorLabels'] = self.numericalFloorLabel_T
         
-        X_train, X_test, y_train, y_test = self.splitData(self.trainAndTestSet, self.numericalLabel_T)
+        X_train, X_test, y_train, y_test = self.splitData(self.trainAndValidationSet, self.numericalLabel_T)
         
         print "Starting training process for the Location Prediction!"
         print "------------------------------------"
         
-        # train a classifier with the training and test data
+        # train a classifier with the training and validation data
         classifier = self.classifyRandomForest(X_train, X_test, y_train, y_test)
         
-        # add predicted floor labels to the dataset
-        self.validationSet['floorLabels'] = self.createNumericalFloorLabels(self.floorPrediction)
+        # add predicted floor labels to the test set
+        self.testSet['floorLabels'] = self.createNumericalFloorLabels(self.floorPrediction)
         
-        # predict the locations usind the dataset, but with predicted labels instead
-        self.locationPrediction = classifier.predict(self.validationSet)
+        # predict the locations using the test set, but with predicted labels instead
+        self.locationPrediction = classifier.predict(self.testSet)
         
         self.errorValue = self.calculateAverageLocationError()
         
         print "Average - error value of missclassified locations in meter:"
         print self.errorValue
+        print "------------------------------------"
+        
+        print "The Confusion Matrix, Precision, Recall and F1 score for the location prediction classifier:"
+        print confusion_matrix(self.numericalLocationLabel_Test, self.locationPrediction)
+        print precision_recall_fscore_support(self.numericalLocationLabel_Test, self.locationPrediction, average='macro')
         print "------------------------------------"
         
     """Method to evaluate the results of the incorrect predicted locations. It takes the
@@ -256,7 +273,7 @@ class Analyzer(object):
         
         # transform the predicted location labels back to coordinates
         predictedCoordinate_labels = [self.repository.locations.keys()[i] for i in self.locationPrediction]
-        groundTruth = [self.repository.locations.keys()[i] for i in self.numericalLabel_V]
+        groundTruth = [self.repository.locations.keys()[i] for i in self.numericalLocationLabel_Test]
         
         # transform the numpy array into a list of tupels
         labelList = tuple(map(tuple, groundTruth))
