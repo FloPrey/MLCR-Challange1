@@ -3,6 +3,7 @@ from configuration import config
 
 import numpy as np
 import pandas as pd
+import os.path
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.model_selection import ShuffleSplit
@@ -90,11 +91,100 @@ class Analyzer(object):
                 
         return floorList
 
+    def improveData(self, percentage_value, normalize):
 
-    def improveData(self):
-        # Ensure that there are no NaNs
+        # ############################ STEP 0 #############################
+        # if an optimized-dataset.csv is found, do not optimize it again.
+        if os.path.isfile("optimized-dataset.csv"):
+            print ("optimised Dataset found. Create new one? [y/n]")
+            input = raw_input()
+            if input == "n":
+                print "loading existing optimised Dataset"
+                self.dataset = pd.read_csv("optimized-dataset.csv", sep='\t')
+                print "dataset size: ", self.dataset.shape
+                return
+
+        deletecolumns = []
+        print "Size of Dataset before Selection: ", self.dataset.shape
+
+        # ############################## STEP 1 ############################
+        # Fill NaN with -85
+        print "Filling NaNs"
         self.dataset = self.dataset.fillna(-85)
-        # Split the dataset into training (90 \%) and testing (10 \%)
+
+        # ############################# STEP 2 #############################
+        # Values smaller then -85db (=unreachable) are replaced by -85db
+        if (normalize == True):
+            print "Normalizing unreachable Access points to -85dB"
+            self.dataset[self.dataset < -85] = -85
+
+        # ############################ STEP 3 #############################
+        # add the location labels
+        numerical_labels = np.array([self.repository.locations.keys().index(tuple(l)) for l in self.labels])
+        numerical_labels = map(int, numerical_labels)
+        self.dataset['location',] = numerical_labels
+
+        # ############################ STEP 4 #############################
+        # clean all AP with a maximum value of -85db
+        # this will increase the speed of the next steps
+        print "removing Access points that are never reachable"
+        for column in self.dataset:
+            datalist = self.dataset[column].tolist()
+            if max(datalist) <= -85:
+                deletecolumns.append(column)
+
+        self.dataset = self.dataset.drop(deletecolumns, axis=1)
+
+        # ############################ STEP 5 #############################
+        # remove AP which do not appear more often then *percentage_value* per Location
+        print "removing Access Points that only appear less then: ", percentage_value, "% per location"
+
+        if percentage_value > 0:
+            goodAP = []
+            badAP = []
+
+            # count amount of different locations we have
+            loc_amount = len(set(numerical_labels))
+
+            for location in range(0, loc_amount):
+
+                # check only Data for current location
+                location_dataset = self.dataset.loc[lambda dataset: dataset.location == location, :]
+                print "location: ", location, "size: ", location_dataset.shape, "GoodAP: ", len(goodAP)
+
+                # amount of measurement data for current location
+                measure_amount = len(self.dataset.loc[lambda dataset: dataset.location == location, :])
+
+                # if a AP appears >70% in the data for a location its a good access point.
+                threshhold = math.ceil(measure_amount * percentage_value / 100)
+
+                for column in location_dataset:
+                    if column != "location" and column not in goodAP:
+                        datalist = location_dataset[column].tolist()
+                        amount = sum(i > -85 for i in datalist)
+
+                        if amount > threshhold:
+                            goodAP.append(column)
+                        else:
+                            badAP.append(column)
+
+            badAP = set(badAP)
+            goodAP = set(goodAP)
+
+            deletecolumns = self.diff(badAP, goodAP)
+
+            # delete those columns
+            self.dataset = self.dataset.drop(deletecolumns, axis=1)
+
+            # delete the location column again
+            self.dataset = self.dataset.drop('location', axis=1)
+
+        print "Size of Dataset after Selection: ", self.dataset.shape
+
+        # ############################ STEP 6 #############################
+        # save cleaned dataset as csv (for further use)
+
+        self.dataset.to_csv("optimized-dataset.csv", sep='\t')
 
     def splitData(self, x_values, y_values):
         
