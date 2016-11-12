@@ -16,7 +16,7 @@ import math
 
 class Analyzer(object):
     
-    #pd.options.mode.chained_assignment = None
+    # pd.options.mode.chained_assignment = None
     
     """Method that loads the datapoints from the repository and transfers them into lists and
     numpy arrays."""
@@ -46,10 +46,11 @@ class Analyzer(object):
         
         self.floorLabels = np.array(floorList)
         
-        self.numericalFloorLabels = self.createNumericalFloorLebels(floorList)
+        self.numericalFloorLabels = self.createNumericalFloorLabels(floorList)
 
         # analyzer.improveData(percentage for ap occurence, set values <-85 to -85)
-        self.improveData(100, True)
+    
+    def createSets(self):
         
         self.dataset['floorLabel'] = self.floorLabels
         self.dataset['numericalFloorLabels'] = self.numericalFloorLabels
@@ -57,7 +58,7 @@ class Analyzer(object):
         
         split = np.random.rand(len(self.dataset)) < 0.9
         
-        datasetCopy=self.dataset.copy()
+        datasetCopy = self.dataset.copy()
         
         firstSet = datasetCopy[split]
         secondSet = datasetCopy[~split]
@@ -75,14 +76,14 @@ class Analyzer(object):
         self.numericalFloorLabel_V = self.validationSet['numericalFloorLabels'].tolist()
         self.numericalLabel_V = self.validationSet['numericalLocationLabel'].tolist()
         
-        self.trainAndTestSet.drop(['floorLabel','numericalFloorLabels','numericalLocationLabel'], axis=1, inplace=True)
-        self.validationSet.drop(['floorLabel','numericalFloorLabels','numericalLocationLabel'], axis=1, inplace=True)
+        self.trainAndTestSet.drop(['floorLabel', 'numericalFloorLabels', 'numericalLocationLabel'], axis=1, inplace=True)
+        self.validationSet.drop(['floorLabel', 'numericalFloorLabels', 'numericalLocationLabel'], axis=1, inplace=True)
         
     """Helper Method to change the String values of the floor string labels into numerical values."""    
-    def createNumericalFloorLebels(self, floorList):
+    def createNumericalFloorLabels(self, floorList):
         
         floorSet = list(set(floorList))
-        numericalSet = range(0, len(floorList)-1)
+        numericalSet = range(0, len(floorList) - 1)
         
         for i in range(len(floorList)):
             for j in range(len(floorSet)):
@@ -196,6 +197,7 @@ class Analyzer(object):
             self.dataset.to_csv(filename, sep='\t')
 
         else:
+            
             print "ERROR! Percentage_value hast to be betweeen 0 and 100."
 
     def splitData(self, x_values, y_values):
@@ -236,7 +238,7 @@ class Analyzer(object):
         classifier = self.classifyRandomForest(X_train, X_test, y_train, y_test)
         
         # add predicted floor labels to the dataset
-        self.validationSet['floorLabels'] = self.createNumericalFloorLebels(self.floorPrediction)
+        self.validationSet['floorLabels'] = self.createNumericalFloorLabels(self.floorPrediction)
         
         # predict the locations usind the dataset, but with predicted labels instead
         self.locationPrediction = classifier.predict(self.validationSet)
@@ -263,10 +265,10 @@ class Analyzer(object):
         errorList = []
         for predicted, truth in zip(predictedCoordinate_labels, labelList):
             if predicted != truth:
-                errorList.append((predicted,truth))
+                errorList.append((predicted, truth))
                 
         print "Percentage of incorrect location predictions:"
-        print float(float(len(errorList))/float(len(labelList)))
+        print float(float(len(errorList)) / float(len(labelList)))
         print "------------------------------------"
         
         
@@ -275,7 +277,7 @@ class Analyzer(object):
         for item in errorList:
             error = error + self.calculateError(item[0], labelList[1])
         
-        return float(error/float(len(errorList)))
+        return float(error / float(len(errorList)))
     
     
     def classifyRandomForest(self, X_train, X_test, y_train, y_test):   
@@ -294,27 +296,27 @@ class Analyzer(object):
 
     def classifyKNearest(self, X_train, X_test, y_train, y_test):
 
-        #Anzahl an Nachbarn die verwendet werden.
+        # Anzahl an Nachbarn die verwendet werden.
         n_neighbors = 15
 
         algorithm = 'auto'
-        #algorithm = 'ball_tree'
-        #algorithm = 'kd_tree'
-        #algorithm = 'brute'
+        # algorithm = 'ball_tree'
+        # algorithm = 'kd_tree'
+        # algorithm = 'brute'
 
-        #Mit unterschiedlichen Gewichtungen klassifizieren
-        #weight function used in prediction. Possible values:
-        #uniform : uniform weights. All points in each neighborhood are weighted equally.
-        #distance : weight points by the inverse of their distance. in this case, closer neighbors of a query point will have a greater influence than neighbors which are further away.
+        # Mit unterschiedlichen Gewichtungen klassifizieren
+        # weight function used in prediction. Possible values:
+        # uniform : uniform weights. All points in each neighborhood are weighted equally.
+        # distance : weight points by the inverse of their distance. in this case, closer neighbors of a query point will have a greater influence than neighbors which are further away.
         for weights in ['uniform', 'distance']:
 
-            #Classifier erzeugen
+            # Classifier erzeugen
             clf = neighbors.KNeighborsClassifier(n_neighbors, weights=weights, algorithm=algorithm)
 
-            #training
+            # training
             clf.fit(X_train, y_train)
 
-            #testing
+            # testing
             score = clf.score(X_test, y_test)
 
             print "KNN-Classifier trained - with score: "
@@ -326,27 +328,27 @@ class Analyzer(object):
 
     def classifyBayesGausch(self, X_train, X_test, y_train, y_test):
 
-        #The number of mixture components. Depending on the data and the value of the weight_concentration_prior the model can decide to not use all the components by setting some component weights_ to values very close to zero. The number of effective components is therefore smaller than n_components.
+        # The number of mixture components. Depending on the data and the value of the weight_concentration_prior the model can decide to not use all the components by setting some component weights_ to values very close to zero. The number of effective components is therefore smaller than n_components.
         n_components = 1
 
         covariance_type = 'full'
-        #covariance_type = 'tied'
-        #covariance_type = 'diag'
-        #covariance_type = 'spherical'
+        # covariance_type = 'tied'
+        # covariance_type = 'diag'
+        # covariance_type = 'spherical'
 
-        #The number of initializations to perform. The result with the highest lower bound value on the likelihood is kept.
+        # The number of initializations to perform. The result with the highest lower bound value on the likelihood is kept.
         n_init = 1
 
-        #The method used to initialize the weights, the means and the covariances
+        # The method used to initialize the weights, the means and the covariances
         init_params = 'kmeans'
-        #init_params = 'random'
+        # init_params = 'random'
 
         clf = BayesianGaussianMixture(n_components=n_components, covariance_type=covariance_type, n_init=n_init, init_params=init_params)
 
-        #training
+        # training
         clf.fit(X_train, y_train)
 
-        #testing
+        # testing
         score = clf.score(X_test, y_test)
 
         print "BayesGausch-Classifier trained - with score: "
@@ -356,15 +358,15 @@ class Analyzer(object):
 
     def classifyNaiveBayes(self, X_train, X_test, y_train, y_test):
 
-        #classifier
+        # classifier
         clf = GaussianNB()
 
-        weight = np.full((len(X_train), 1), 10, dtype=np.int)
+        #weight = np.full((len(X_train), 1), 10, dtype=np.int)
 
-        #training
-        clf.fit(X_train, y_train, weight)
+        # training
+        clf.fit(X_train, y_train)
 
-        #testing
+        # testing
         score = clf.score(X_test, y_test)
 
         
@@ -375,22 +377,24 @@ class Analyzer(object):
 
     def classifySVC(self, X_train, X_test, y_train, y_test):
         
-        self.cv = ShuffleSplit(X_train.shape[0], n_iter=10, test_size=0.2,
-                               random_state=0)
+        self.cv = ShuffleSplit(n_splits=3, test_size=.25, random_state=0)
         
         # Define the classifier to use
-        estimator = SVC(kernel='linear')
+        estimator = SVC(kernel='poly')
+        # estimator = SVC(kernel='linear')
+        # estimator = SVC(kernel='rbf')
+        # estimator = SVC(kernel='sigmoid')
 
         # Define parameter space.
-        gammas = np.logspace(-6, -1, 10)
+        gammas = np.logspace(-10, 3, 13)
 
         # Use Test dataset and use cross validation to find bet hyper-parameters.
-        classifier = GridSearchCV(estimator=estimator, cv=self.cv,
+        clf = GridSearchCV(estimator=estimator, cv=self.cv,
                                   param_grid=dict(gamma=gammas))
-        classifier.fit(X_train, y_train)
+        clf.fit(X_train, y_train)
 
         # Test final results with the testing dataset
-        score = classifier.score(X_test, y_test)
+        score = clf.score(X_test, y_test)
 
         print "SVM-Classifier trained - with score: "
         print score
@@ -403,4 +407,4 @@ class Analyzer(object):
         radius = 6371000.785
         d_latitude = abs(tuple1[0] - tuple2[0])
         d_longitude = abs(tuple1[1] - tuple2[1])
-        return round(radius*math.sqrt((math.pi*d_latitude/180)**2 + (math.pi*d_longitude/180)**2), 2)
+        return round(radius * math.sqrt((math.pi * d_latitude / 180) ** 2 + (math.pi * d_longitude / 180) ** 2), 2)
