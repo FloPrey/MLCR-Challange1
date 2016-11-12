@@ -14,6 +14,7 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import precision_recall_fscore_support
 from sklearn.metrics import confusion_matrix
+from sklearn.model_selection import cross_val_score
 import math
 
 class Analyzer(object):
@@ -217,17 +218,25 @@ class Analyzer(object):
         # split the trainAndValidationSet into a training and a validation set
         X_train, X_test, y_train, y_test = self.splitData(self.trainAndValidationSet, self.floorLabel_T)   
         
+        print "-------------------------------------------------------"
         print "Starting training process for the Floor Prediction!"
-        print "------------------------------------"
+        print "-------------------------------------------------------"
         
         # train the chosen classifier
-        classifier = self.classifyRandomForest(X_train, X_test, y_train, y_test)
+        #classifier = self.classifyRandomForest(X_train, X_test, y_train, y_test)
+        classifier = self.classifyRandomForest(self.trainAndValidationSet, self.floorLabel_T)
         
         # perform the actual prediction using the test set
         self.floorPrediction = classifier.predict(self.testSet)
         
-        print "The Confusion Matrix, Precision, Recall and F1 score for the floor prediction classifier:"
+        print "Test set evaluation:"
+        print "------------------------------------"
+        print "The Confusion Matrix:"
+        print "------------------------------------"
         print confusion_matrix(self.floorLabel_Test, self.floorPrediction)
+        print "------------------------------------"
+        print "Precision, Recall and F1 score for the floor prediction classifier:"
+        print "------------------------------------"
         print precision_recall_fscore_support(self.floorLabel_Test, self.floorPrediction, average='macro')
         print "------------------------------------"
         
@@ -241,13 +250,12 @@ class Analyzer(object):
         # add floor labels to the train and validation set for training/validation
         self.trainAndValidationSet['floorLabels'] = self.numericalFloorLabel_T
         
-        X_train, X_test, y_train, y_test = self.splitData(self.trainAndValidationSet, self.numericalLabel_T)
-        
+        print "-------------------------------------------------------"
         print "Starting training process for the Location Prediction!"
-        print "------------------------------------"
+        print "-------------------------------------------------------"
         
         # train a classifier with the training and validation data
-        classifier = self.classifyRandomForest(X_train, X_test, y_train, y_test)
+        classifier = self.classifyRandomForest(self.trainAndValidationSet, self.numericalLabel_T)
         
         # add predicted floor labels to the test set
         self.testSet['floorLabels'] = self.createNumericalFloorLabels(self.floorPrediction)
@@ -258,11 +266,18 @@ class Analyzer(object):
         self.errorValue = self.calculateAverageLocationError()
         
         print "Average - error value of missclassified locations in meter:"
+        print "------------------------------------"
         print self.errorValue
         print "------------------------------------"
         
-        print "The Confusion Matrix, Precision, Recall and F1 score for the location prediction classifier:"
+        print "Test set evaluation:"
+        print "------------------------------------"
+        print "The Confusion Matrix:"
+        print "------------------------------------"
         print confusion_matrix(self.numericalLocationLabel_Test, self.locationPrediction)
+        print "------------------------------------"
+        print "Precision, Recall and F1 score for the location prediction classifier:"
+        print "------------------------------------"
         print precision_recall_fscore_support(self.numericalLocationLabel_Test, self.locationPrediction, average='macro')
         print "------------------------------------"
         
@@ -288,7 +303,6 @@ class Analyzer(object):
         print float(float(len(errorList)) / float(len(labelList)))
         print "------------------------------------"
         
-        
         # calculate the error value in meter between the incorrect predicted values and the ground truth
         error = 0.0
         for item in errorList:
@@ -297,28 +311,30 @@ class Analyzer(object):
         return float(error / float(len(errorList)))
     
     
-    def classifyRandomForest(self, X_train, X_test, y_train, y_test):   
+    def classifyRandomForest(self, input, label):   
         
         estimators = 200
         
         clf = RandomForestClassifier(n_estimators=estimators)
-        clf = clf.fit(X_train, y_train)
-        score = clf.score(X_test, y_test) 
+               
+        clf = clf.fit(input, label)        
+        score = cross_val_score(clf, input, label, cv=5)
         
-        print "RandomForest-Classifier trained - with score: "
+        print "RandomForest-Classifier trained - with cross-val-scores:"
+        print "------------------------------------"
         print score
         print "------------------------------------"
         
         return clf
 
-    def classifyKNearest(self, X_train, X_test, y_train, y_test):
+    def classifyKNearest(self, input, label):
 
         # Anzahl an Nachbarn die verwendet werden.
-        n_neighbors = 15
+        #n_neighbors = 15
 
-        algorithm = 'auto'
+        #algorithm = 'auto'
         # algorithm = 'ball_tree'
-        # algorithm = 'kd_tree'
+        algorithm = 'kd_tree'
         # algorithm = 'brute'
 
         # Mit unterschiedlichen Gewichtungen klassifizieren
@@ -329,21 +345,25 @@ class Analyzer(object):
 
             # Classifier erzeugen
             clf = neighbors.KNeighborsClassifier(n_neighbors, weights=weights, algorithm=algorithm)
+            
+            params = {"n_neighbors": np.arange(1, 31, 2), "metric": ["euclidean", "cityblock"]}
+            grid = RandomizedSearchCV(model, params)
+            grid.fit(trainData, trainLabels)
 
             # training
-            clf.fit(X_train, y_train)
+            clf.fit(input, label)
 
             # testing
-            score = clf.score(X_test, y_test)
+            score = cross_val_score(clf, input, label, cv=5)
 
-            print "KNN-Classifier trained - with score: "
+            print "KNN-Classifier trained - with cross-val-scores: "
+            print "------------------------------------"
             print score
             print "------------------------------------"
             
             return clf
 
-
-    def classifyBayesGausch(self, X_train, X_test, y_train, y_test):
+    def classifyBayesGausch(self, input, label):
 
         # The number of mixture components. Depending on the data and the value of the weight_concentration_prior the model can decide to not use all the components by setting some component weights_ to values very close to zero. The number of effective components is therefore smaller than n_components.
         n_components = 1
@@ -363,17 +383,18 @@ class Analyzer(object):
         clf = BayesianGaussianMixture(n_components=n_components, covariance_type=covariance_type, n_init=n_init, init_params=init_params)
 
         # training
-        clf.fit(X_train, y_train)
+        clf.fit(input, label)
 
         # testing
-        score = clf.score(X_test, y_test)
+        score = cross_val_score(clf, input, label, cv=5)
 
-        print "BayesGausch-Classifier trained - with score: "
+        print "BayesGausch-Classifier trained - with cross-val-scores: "
+        print "------------------------------------"
         print score
         print "------------------------------------"
         return clf
 
-    def classifyNaiveBayes(self, X_train, X_test, y_train, y_test):
+    def classifyNaiveBayes(self, input, label):
 
         # classifier
         clf = GaussianNB()
@@ -381,18 +402,18 @@ class Analyzer(object):
         #weight = np.full((len(X_train), 1), 10, dtype=np.int)
 
         # training
-        clf.fit(X_train, y_train)
+        clf.fit(input, label)
 
         # testing
-        score = clf.score(X_test, y_test)
-
+        score = cross_val_score(clf, input, label, cv=5)
         
-        print "NaiveBayes-Classifier trained - with score: "
+        print "NaiveBayes-Classifier trained - with cross-val-scores: "
+        print "------------------------------------"
         print score
         print "------------------------------------"
         return clf
 
-    def classifySVC(self, X_train, X_test, y_train, y_test):
+    def classifySVC(self, input, label):
         
         self.cv = ShuffleSplit(n_splits=3, test_size=.25, random_state=0)
         
@@ -408,12 +429,13 @@ class Analyzer(object):
         # Use Test dataset and use cross validation to find bet hyper-parameters.
         clf = GridSearchCV(estimator=estimator, cv=self.cv,
                                   param_grid=dict(gamma=gammas))
-        clf.fit(X_train, y_train)
+        clf.fit(input, label)
 
         # Test final results with the testing dataset
-        score = clf.score(X_test, y_test)
+        score = cross_val_score(clf, input, label, cv=5)
 
-        print "SVM-Classifier trained - with score: "
+        print "SVM-Classifier trained - with cross-val-scores: "
+        print "------------------------------------"
         print score
         print "------------------------------------"
         return clf
