@@ -47,8 +47,9 @@ class Analyzer(object):
         self.floorLabels = np.array(floorList)
         
         self.numericalFloorLabels = self.createNumericalFloorLebels(floorList)
-        
-        self.improveData()
+
+        # analyzer.improveData(percentage for ap occurence, set values <-85 to -85)
+        self.improveData(70, True)
         
         self.dataset['floorLabel'] = self.floorLabels
         self.dataset['numericalFloorLabels'] = self.numericalFloorLabels
