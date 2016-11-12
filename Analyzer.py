@@ -49,7 +49,7 @@ class Analyzer(object):
         self.numericalFloorLabels = self.createNumericalFloorLebels(floorList)
 
         # analyzer.improveData(percentage for ap occurence, set values <-85 to -85)
-        self.improveData(70, True)
+        self.improveData(100, True)
         
         self.dataset['floorLabel'] = self.floorLabels
         self.dataset['numericalFloorLabels'] = self.numericalFloorLabels
@@ -92,16 +92,22 @@ class Analyzer(object):
                 
         return floorList
 
+    def diff(self, first, second):
+        second = set(second)
+        return [item for item in first if item not in second]
+
     def improveData(self, percentage_value, normalize):
 
         # ############################ STEP 0 #############################
-        # if an optimized-dataset.csv is found, do not optimize it again.
-        if os.path.isfile("optimized-dataset.csv"):
-            print ("optimised Dataset found. Create new one? [y/n]")
+        # if an optimized-dataset-70.csv is found, do not optimize it again.
+
+        filename = "optimized-dataset-" + str(percentage_value) +".csv"
+        if os.path.isfile(filename):
+            print ("optimised Dataset found with ", percentage_value, "% . Create new one? [y/n]")
             input = raw_input()
             if input == "n":
                 print "loading existing optimised Dataset"
-                self.dataset = pd.read_csv("optimized-dataset.csv", sep='\t')
+                self.dataset = pd.read_csv(filename, sep='\t')
                 print "dataset size: ", self.dataset.shape
                 return
 
@@ -140,7 +146,7 @@ class Analyzer(object):
         # remove AP which do not appear more often then *percentage_value* per Location
         print "removing Access Points that only appear less then: ", percentage_value, "% per location"
 
-        if percentage_value > 0:
+        if percentage_value >= 0 and percentage_value <= 100:
             goodAP = []
             badAP = []
 
@@ -151,7 +157,6 @@ class Analyzer(object):
 
                 # check only Data for current location
                 location_dataset = self.dataset.loc[lambda dataset: dataset.location == location, :]
-                print "location: ", location, "size: ", location_dataset.shape, "GoodAP: ", len(goodAP)
 
                 # amount of measurement data for current location
                 measure_amount = len(self.dataset.loc[lambda dataset: dataset.location == location, :])
@@ -159,12 +164,15 @@ class Analyzer(object):
                 # if a AP appears >70% in the data for a location its a good access point.
                 threshhold = math.ceil(measure_amount * percentage_value / 100)
 
+                print "location: ", location, "size: ", location_dataset.shape, "threshhold: ", threshhold, "GoodAP: ", len(
+                    goodAP)
+
                 for column in location_dataset:
                     if column != "location" and column not in goodAP:
                         datalist = location_dataset[column].tolist()
                         amount = sum(i > -85 for i in datalist)
 
-                        if amount > threshhold:
+                        if amount >= threshhold:
                             goodAP.append(column)
                         else:
                             badAP.append(column)
@@ -180,12 +188,15 @@ class Analyzer(object):
             # delete the location column again
             self.dataset = self.dataset.drop('location', axis=1)
 
-        print "Size of Dataset after Selection: ", self.dataset.shape
+            print "Size of Dataset after Selection: ", self.dataset.shape
 
-        # ############################ STEP 6 #############################
-        # save cleaned dataset as csv (for further use)
+            # ############################ STEP 6 #############################
+            # save cleaned dataset as csv (for further use)
 
-        self.dataset.to_csv("optimized-dataset.csv", sep='\t')
+            self.dataset.to_csv(filename, sep='\t')
+
+        else:
+            print "ERROR! Percentage_value hast to be betweeen 0 and 100."
 
     def splitData(self, x_values, y_values):
         
