@@ -19,8 +19,6 @@ import math
 
 class Analyzer(object):
     
-    # pd.options.mode.chained_assignment = None
-    
     """Method that loads the datapoints from the repository and transfers them into lists and
     numpy arrays."""
     def loadData(self):
@@ -53,19 +51,24 @@ class Analyzer(object):
 
         # analyzer.improveData(percentage for ap occurence, set values <-85 to -85)
     
+    
+    """Method that splits the dataset into an initial training-and validation-set and one test-set."""
     def createSets(self):
         
+        # add output labels to the dataframe to make sure they are split in the same way
         self.dataset['floorLabel'] = self.floorLabels
         self.dataset['numericalFloorLabels'] = self.numericalFloorLabels
 
+        # split the dataset
         X_train, X_test, y_train, y_test = train_test_split(self.dataset, self.numerical_labels, test_size=0.1)
         
+        # copy the datasets to prevent misuse of further delete/add operations
         self.trainAndValidationSet = X_train.copy()
         self.testSet = X_test.copy()
         self.numericalLocationLabel_T = y_train.copy()
         self.numericalLocationLabel_Test = y_test.copy()
         
-        # test and evaluation labels
+        # train and evaluation labels
         self.floorLabel_T = self.trainAndValidationSet['floorLabel'].tolist()
         self.numericalFloorLabel_T = self.trainAndValidationSet['numericalFloorLabels'].tolist()
         
@@ -73,10 +76,11 @@ class Analyzer(object):
         self.floorLabel_Test = self.testSet['floorLabel'].tolist()
         self.numericalFloorLabel_Test = self.testSet['numericalFloorLabels'].tolist()
         
+        # delete labels from the original dataset
         self.trainAndValidationSet.drop(['floorLabel', 'numericalFloorLabels'], axis=1, inplace=True)
         self.testSet.drop(['floorLabel', 'numericalFloorLabels'], axis=1, inplace=True)
         
-    """Helper Method to change the String values of the floor string labels into numerical values."""    
+    """Helper Method to change the string values of the floor string labels into numerical values."""    
     def createNumericalFloorLabels(self, floorList):
         
         floorSet = list(set(floorList))
@@ -90,10 +94,15 @@ class Analyzer(object):
                 
         return floorList
 
+
+    """Helper method to get the difference between two lists."""
     def diff(self, first, second):
         second = set(second)
         return [item for item in first if item not in second]
 
+
+    """Method to optimize the data at hand. It loads already optimized data from a csv file if available.
+    Allows to load different kind of datasets with different optimization criteria. """
     def improveData(self, percentage_value, normalize):
 
         # ############################ STEP 0 #############################
@@ -197,6 +206,8 @@ class Analyzer(object):
             
             print "ERROR! Percentage_value hast to be betweeen 0 and 100."
 
+
+    """Helper method to split data into training and validation set."""
     def splitData(self, x_values, y_values):
         
         X_train, X_test, y_train, y_test = train_test_split(x_values, y_values, test_size=0.1)
@@ -204,17 +215,23 @@ class Analyzer(object):
         return X_train, X_test, y_train, y_test
 
     """Method to train a classifier to learn to predict the floor of the given datapoints."""
-    def predictFloor(self): 
+    def predictFloor(self, classifierAlg): 
         
-        print "-------------------------------------------------------"
+        print "\n-------------------------------------------------------"
         print "Starting training process for the Floor Prediction!"
         print "-------------------------------------------------------"
         
-        # train the chosen classifier
-        #classifier = self.classifyRandomForest(X_train, X_test, y_train, y_test)
-        classifier = self.classifyRandomForest(self.trainAndValidationSet, self.floorLabel_T)
+        # train the chosen classifier using the trainAndValidationSet
+        if (classifierAlg == "RandomForest"):
+            classifier = self.classifyRandomForest(self.trainAndValidationSet, self.floorLabel_T)
+        elif (classifierAlg == "KNN"):
+            classifier = self.classifyKNearest(self.trainAndValidationSet, self.floorLabel_T)
+        elif (classifierAlg == "NaiveBayes"):
+            classifier = self.classifyNaiveBayes(self.trainAndValidationSet, self.floorLabel_T)
+        else:
+            classifier = self.classifySVC(self.trainAndValidationSet, self.floorLabel_T)
         
-        # perform the actual prediction using the test set
+        # perform the actual prediction using the test-set
         self.floorPrediction = classifier.predict(self.testSet)
         
         print "Test set evaluation:"
@@ -230,20 +247,26 @@ class Analyzer(object):
         
         
     """This method predicts the location of the previously loaded dataset. 
-    The dataset must also contain the floorLabels to increase accurracy. 
-    The original labels are added for the training process, however for the
-    prediction we use the previously predicted floors from the predictFloor method."""    
-    def predictLocation(self):
+    The original labels of the floors are added for the training process, however for the
+    prediction the previously predicted floors from the predictFloor method are used."""    
+    def predictLocation(self, classifierAlg):
         
         # add floor labels to the train and validation set for training/validation
         self.trainAndValidationSet['floorLabels'] = self.numericalFloorLabel_T
         
-        print "-------------------------------------------------------"
+        print "\n-------------------------------------------------------"
         print "Starting training process for the Location Prediction!"
         print "-------------------------------------------------------"
         
-        # train a classifier with the training and validation data
-        classifier = self.classifyRandomForest(self.trainAndValidationSet, self.numericalLocationLabel_T)
+        # train the chosen classifier using the trainAndValidationSet
+        if (classifierAlg == "RandomForest"):
+            classifier = self.classifyRandomForest(self.trainAndValidationSet, self.numericalLocationLabel_T)
+        elif (classifierAlg == "KNN"):
+            classifier = self.classifyKNearest(self.trainAndValidationSet, self.numericalLocationLabel_T)
+        elif (classifierAlg == "NaiveBayes"):
+            classifier = self.classifyNaiveBayes(self.trainAndValidationSet, self.numericalLocationLabel_T)
+        else:
+            classifier = self.classifySVC(self.trainAndValidationSet, self.numericalLocationLabel_T)
         
         # add predicted floor labels to the test set
         self.testSet['floorLabels'] = self.createNumericalFloorLabels(self.floorPrediction)
@@ -251,6 +274,7 @@ class Analyzer(object):
         # predict the locations using the test set, but with predicted labels instead
         self.locationPrediction = classifier.predict(self.testSet)
         
+        # calculate the error value in meter
         self.errorValue = self.calculateAverageLocationError()
         
         print "Average - error value of missclassified locations in meter:"
@@ -299,6 +323,7 @@ class Analyzer(object):
         return float(error / float(len(errorList)))
     
     
+    """Imlementation of the Random Forest classifier."""
     def classifyRandomForest(self, input, label):   
         
         estimators = 200
@@ -316,71 +341,40 @@ class Analyzer(object):
         
         return clf
 
+
+    """Implementation of the K-Nearest Neigbour classifier."""
     def classifyKNearest(self, input, label):
 
         # Anzahl an Nachbarn die verwendet werden.
-        #n_neighbors = 15
+        n_neighbors = 15
 
         #algorithm = 'auto'
         # algorithm = 'ball_tree'
         algorithm = 'kd_tree'
         # algorithm = 'brute'
-
-        # Mit unterschiedlichen Gewichtungen klassifizieren
+        
         # weight function used in prediction. Possible values:
         # uniform : uniform weights. All points in each neighborhood are weighted equally.
         # distance : weight points by the inverse of their distance. in this case, closer neighbors of a query point will have a greater influence than neighbors which are further away.
-        for weights in ['uniform', 'distance']:
-
-            # Classifier erzeugen
-            clf = neighbors.KNeighborsClassifier(n_neighbors, weights=weights, algorithm=algorithm)
-            
-            params = {"n_neighbors": np.arange(1, 31, 2), "metric": ["euclidean", "cityblock"]}            
-
-            # CV testing + training
-            score = cross_val_score(clf, input, label, cv=5)
-            
-            # real training
-            clf.fit(input, label)
-
-            print "KNN-Classifier trained - with cross-val-scores: "
-            print "------------------------------------"
-            print score
-            print "------------------------------------"
-            
-            return clf
-
-    def classifyBayesGausch(self, input, label):
-
-        # The number of mixture components. Depending on the data and the value of the weight_concentration_prior the model can decide to not use all the components by setting some component weights_ to values very close to zero. The number of effective components is therefore smaller than n_components.
-        n_components = 1
-
-        covariance_type = 'full'
-        # covariance_type = 'tied'
-        # covariance_type = 'diag'
-        # covariance_type = 'spherical'
-
-        # The number of initializations to perform. The result with the highest lower bound value on the likelihood is kept.
-        n_init = 1
-
-        # The method used to initialize the weights, the means and the covariances
-        init_params = 'kmeans'
-        # init_params = 'random'
-
-        clf = BayesianGaussianMixture(n_components=n_components, covariance_type=covariance_type, n_init=n_init, init_params=init_params)
+        weights = 'distance'
+       
+        # create Classifier
+        clf = neighbors.KNeighborsClassifier(n_neighbors, weights=weights, algorithm=algorithm)           
 
         # CV testing + training
         score = cross_val_score(clf, input, label, cv=5)
         
-        # training
+        # real training
         clf.fit(input, label)
 
-        print "BayesGausch-Classifier trained - with cross-val-scores: "
+        print "KNN-Classifier trained using " + weights + " and " + algorithm + " - with cross-val-scores: "
         print "------------------------------------"
         print score
         print "------------------------------------"
+        
         return clf
 
+    """Implementation of the Naive Bayes classifier."""
     def classifyNaiveBayes(self, input, label):
 
         # classifier
@@ -400,6 +394,7 @@ class Analyzer(object):
         print "------------------------------------"
         return clf
 
+    """Implementation of the SVM classifier."""
     def classifySVC(self, input, label):
         
         self.cv = ShuffleSplit(n_splits=3, test_size=.25, random_state=0)
