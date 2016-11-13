@@ -57,33 +57,24 @@ class Analyzer(object):
         
         self.dataset['floorLabel'] = self.floorLabels
         self.dataset['numericalFloorLabels'] = self.numericalFloorLabels
-        self.dataset['numericalLocationLabel'] = self.numerical_labels
+
+        X_train, X_test, y_train, y_test = train_test_split(self.dataset, self.numerical_labels, test_size=0.1)
         
-        split = np.random.rand(len(self.dataset)) < 0.9
-        
-        datasetCopy = self.dataset.copy()
-        
-        firstSet = datasetCopy[split]
-        secondSet = datasetCopy[~split]
-        
-        # input train and validation set
-        self.trainAndValidationSet = firstSet.copy()
-        
-        # input test set
-        self.testSet = secondSet.copy()
+        self.trainAndValidationSet = X_train.copy()
+        self.testSet = X_test.copy()
+        self.numericalLocationLabel_T = y_train.copy()
+        self.numericalLocationLabel_Test = y_test.copy()
         
         # test and evaluation labels
         self.floorLabel_T = self.trainAndValidationSet['floorLabel'].tolist()
         self.numericalFloorLabel_T = self.trainAndValidationSet['numericalFloorLabels'].tolist()
-        self.numericalLabel_T = self.trainAndValidationSet['numericalLocationLabel'].tolist()
         
         # labels for the testing
         self.floorLabel_Test = self.testSet['floorLabel'].tolist()
         self.numericalFloorLabel_Test = self.testSet['numericalFloorLabels'].tolist()
-        self.numericalLocationLabel_Test = self.testSet['numericalLocationLabel'].tolist()
         
-        self.trainAndValidationSet.drop(['floorLabel', 'numericalFloorLabels', 'numericalLocationLabel'], axis=1, inplace=True)
-        self.testSet.drop(['floorLabel', 'numericalFloorLabels', 'numericalLocationLabel'], axis=1, inplace=True)
+        self.trainAndValidationSet.drop(['floorLabel', 'numericalFloorLabels'], axis=1, inplace=True)
+        self.testSet.drop(['floorLabel', 'numericalFloorLabels'], axis=1, inplace=True)
         
     """Helper Method to change the String values of the floor string labels into numerical values."""    
     def createNumericalFloorLabels(self, floorList):
@@ -252,7 +243,7 @@ class Analyzer(object):
         print "-------------------------------------------------------"
         
         # train a classifier with the training and validation data
-        classifier = self.classifyRandomForest(self.trainAndValidationSet, self.numericalLabel_T)
+        classifier = self.classifyRandomForest(self.trainAndValidationSet, self.numericalLocationLabel_T)
         
         # add predicted floor labels to the test set
         self.testSet['floorLabels'] = self.createNumericalFloorLabels(self.floorPrediction)
