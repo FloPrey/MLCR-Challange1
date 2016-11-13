@@ -215,14 +215,21 @@ class Analyzer(object):
         return X_train, X_test, y_train, y_test
 
     """Method to train a classifier to learn to predict the floor of the given datapoints."""
-    def predictFloor(self): 
+    def predictFloor(self, classifierAlg): 
         
-        print "-------------------------------------------------------"
+        print "\n-------------------------------------------------------"
         print "Starting training process for the Floor Prediction!"
         print "-------------------------------------------------------"
         
         # train the chosen classifier using the trainAndValidationSet
-        classifier = self.classifyKNearest(self.trainAndValidationSet, self.floorLabel_T)
+        if (classifierAlg == "RandomForest"):
+            classifier = self.classifyRandomForest(self.trainAndValidationSet, self.floorLabel_T)
+        elif (classifierAlg == "KNN"):
+            classifier = self.classifyKNearest(self.trainAndValidationSet, self.floorLabel_T)
+        elif (classifierAlg == "NaiveBayes"):
+            classifier = self.classifyNaiveBayes(self.trainAndValidationSet, self.floorLabel_T)
+        else:
+            classifier = self.classifySVC(self.trainAndValidationSet, self.floorLabel_T)
         
         # perform the actual prediction using the test-set
         self.floorPrediction = classifier.predict(self.testSet)
@@ -242,7 +249,7 @@ class Analyzer(object):
     """This method predicts the location of the previously loaded dataset. 
     The original labels of the floors are added for the training process, however for the
     prediction the previously predicted floors from the predictFloor method are used."""    
-    def predictLocation(self):
+    def predictLocation(self, classifierAlg):
         
         # add floor labels to the train and validation set for training/validation
         self.trainAndValidationSet['floorLabels'] = self.numericalFloorLabel_T
@@ -251,8 +258,15 @@ class Analyzer(object):
         print "Starting training process for the Location Prediction!"
         print "-------------------------------------------------------"
         
-        # train a classifier with the training and validation data
-        classifier = self.classifyKNearest(self.trainAndValidationSet, self.numericalLocationLabel_T)
+        # train the chosen classifier using the trainAndValidationSet
+        if (classifierAlg == "RandomForest"):
+            classifier = self.classifyRandomForest(self.trainAndValidationSet, self.numericalLocationLabel_T)
+        elif (classifierAlg == "KNN"):
+            classifier = self.classifyKNearest(self.trainAndValidationSet, self.numericalLocationLabel_T)
+        elif (classifierAlg == "NaiveBayes"):
+            classifier = self.classifyNaiveBayes(self.trainAndValidationSet, self.numericalLocationLabel_T)
+        else:
+            classifier = self.classifySVC(self.trainAndValidationSet, self.numericalLocationLabel_T)
         
         # add predicted floor labels to the test set
         self.testSet['floorLabels'] = self.createNumericalFloorLabels(self.floorPrediction)
@@ -358,38 +372,6 @@ class Analyzer(object):
         print score
         print "------------------------------------"
         
-        return clf
-
-    """Implementation of the Bayes Gausch classifier."""
-    def classifyBayesGausch(self, input, label):
-
-        # The number of mixture components. Depending on the data and the value of the weight_concentration_prior the model can decide to not use all the components by setting some component weights_ to values very close to zero. The number of effective components is therefore smaller than n_components.
-        n_components = 1
-
-        covariance_type = 'full'
-        # covariance_type = 'tied'
-        # covariance_type = 'diag'
-        # covariance_type = 'spherical'
-
-        # The number of initializations to perform. The result with the highest lower bound value on the likelihood is kept.
-        n_init = 1
-
-        # The method used to initialize the weights, the means and the covariances
-        init_params = 'kmeans'
-        # init_params = 'random'
-
-        clf = BayesianGaussianMixture(n_components=n_components, covariance_type=covariance_type, n_init=n_init, init_params=init_params)
-
-        # CV testing + training
-        score = cross_val_score(clf, input, label, cv=5)
-        
-        # training
-        clf.fit(input, label)
-
-        print "BayesGausch-Classifier trained - with cross-val-scores: "
-        print "------------------------------------"
-        print score
-        print "------------------------------------"
         return clf
 
     """Implementation of the Naive Bayes classifier."""
