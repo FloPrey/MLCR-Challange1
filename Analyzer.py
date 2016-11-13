@@ -212,7 +212,7 @@ class Analyzer(object):
         
         # train the chosen classifier
         #classifier = self.classifyRandomForest(X_train, X_test, y_train, y_test)
-        classifier = self.classifyRandomForest(self.trainAndValidationSet, self.floorLabel_T)
+        classifier = self.classifyKNearest(self.trainAndValidationSet, self.floorLabel_T)
         
         # perform the actual prediction using the test set
         self.floorPrediction = classifier.predict(self.testSet)
@@ -243,7 +243,7 @@ class Analyzer(object):
         print "-------------------------------------------------------"
         
         # train a classifier with the training and validation data
-        classifier = self.classifyRandomForest(self.trainAndValidationSet, self.numericalLocationLabel_T)
+        classifier = self.classifyKNearest(self.trainAndValidationSet, self.numericalLocationLabel_T)
         
         # add predicted floor labels to the test set
         self.testSet['floorLabels'] = self.createNumericalFloorLabels(self.floorPrediction)
@@ -319,36 +319,33 @@ class Analyzer(object):
     def classifyKNearest(self, input, label):
 
         # Anzahl an Nachbarn die verwendet werden.
-        #n_neighbors = 15
+        n_neighbors = 15
 
         #algorithm = 'auto'
         # algorithm = 'ball_tree'
         algorithm = 'kd_tree'
         # algorithm = 'brute'
-
-        # Mit unterschiedlichen Gewichtungen klassifizieren
+        
         # weight function used in prediction. Possible values:
         # uniform : uniform weights. All points in each neighborhood are weighted equally.
         # distance : weight points by the inverse of their distance. in this case, closer neighbors of a query point will have a greater influence than neighbors which are further away.
-        for weights in ['uniform', 'distance']:
+        weights = 'distance'
+       
+        # create Classifier
+        clf = neighbors.KNeighborsClassifier(n_neighbors, weights=weights, algorithm=algorithm)           
 
-            # Classifier erzeugen
-            clf = neighbors.KNeighborsClassifier(n_neighbors, weights=weights, algorithm=algorithm)
-            
-            params = {"n_neighbors": np.arange(1, 31, 2), "metric": ["euclidean", "cityblock"]}            
+        # CV testing + training
+        score = cross_val_score(clf, input, label, cv=5)
+        
+        # real training
+        clf.fit(input, label)
 
-            # CV testing + training
-            score = cross_val_score(clf, input, label, cv=5)
-            
-            # real training
-            clf.fit(input, label)
-
-            print "KNN-Classifier trained - with cross-val-scores: "
-            print "------------------------------------"
-            print score
-            print "------------------------------------"
-            
-            return clf
+        print "KNN-Classifier trained using " + weights + " and " + algorithm + " - with cross-val-scores: "
+        print "------------------------------------"
+        print score
+        print "------------------------------------"
+        
+        return clf
 
     def classifyBayesGausch(self, input, label):
 
