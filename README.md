@@ -15,8 +15,8 @@ During the first call of the programme, it will generate a csv file containing t
 
 The output of the programme will show :
 
-1) the cross fold validation score (accuracy) of the classifiers for 5 iterations
-2) The confusion matrix of the results from the test-set evaluation on the unseen data
-3) The precision, recall and f1 score of the results from the test-set evaluation
-4) The percentage of misclassified classes (for the second classifier)
-5) The average error in meter for the misclassified classes 
+1. The cross fold validation score (accuracy) of the classifiers for 5 iterations
+2. The confusion matrix of the results from the test-set evaluation on the unseen data
+3. The precision, recall and f1 score of the results from the test-set evaluation
+4. The percentage of misclassified classes (for the second classifier)
+5. The average error in meter for the misclassified classes 
