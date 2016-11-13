@@ -223,8 +223,7 @@ class Analyzer(object):
         print "-------------------------------------------------------"
         
         # train the chosen classifier
-        #classifier = self.classifyRandomForest(X_train, X_test, y_train, y_test)
-        classifier = self.classifyRandomForest(self.trainAndValidationSet, self.floorLabel_T)
+        classifier = self.classifyRandomForest(X_train, X_test, y_train, y_test)
         
         # perform the actual prediction using the test set
         self.floorPrediction = classifier.predict(self.testSet)
@@ -250,12 +249,14 @@ class Analyzer(object):
         # add floor labels to the train and validation set for training/validation
         self.trainAndValidationSet['floorLabels'] = self.numericalFloorLabel_T
         
+        X_train, X_test, y_train, y_test = self.splitData(self.trainAndValidationSet, self.numericalLabel_T)
+        
         print "-------------------------------------------------------"
         print "Starting training process for the Location Prediction!"
         print "-------------------------------------------------------"
         
         # train a classifier with the training and validation data
-        classifier = self.classifyRandomForest(self.trainAndValidationSet, self.numericalLabel_T)
+        classifier = self.classifyRandomForest(X_train, X_test, y_train, y_test)
         
         # add predicted floor labels to the test set
         self.testSet['floorLabels'] = self.createNumericalFloorLabels(self.floorPrediction)
@@ -311,23 +312,23 @@ class Analyzer(object):
         return float(error / float(len(errorList)))
     
     
-    def classifyRandomForest(self, input, label):   
+    def classifyRandomForest(self, X_train, X_test, y_train, y_test):   
         
         estimators = 200
         
         clf = RandomForestClassifier(n_estimators=estimators)
                
-        clf = clf.fit(input, label)        
-        score = cross_val_score(clf, input, label, cv=5)
+        clf = clf.fit(X_train, y_train)        
+        score = clf.score(X_test, y_test)
         
-        print "RandomForest-Classifier trained - with cross-val-scores:"
+        print "RandomForest-Classifier trained - with accuracy score:"
         print "------------------------------------"
         print score
         print "------------------------------------"
         
         return clf
 
-    def classifyKNearest(self, input, label):
+    def classifyKNearest(self, X_train, X_test, y_train, y_test):
 
         # Anzahl an Nachbarn die verwendet werden.
         #n_neighbors = 15
@@ -351,19 +352,19 @@ class Analyzer(object):
             grid.fit(trainData, trainLabels)
 
             # training
-            clf.fit(input, label)
+            clf.fit(X_train, y_train)
 
             # testing
-            score = cross_val_score(clf, input, label, cv=5)
+            score = clf.score(X_test, y_test)
 
-            print "KNN-Classifier trained - with cross-val-scores: "
+            print "KNN-Classifier trained - with accuracy score: "
             print "------------------------------------"
             print score
             print "------------------------------------"
             
             return clf
 
-    def classifyBayesGausch(self, input, label):
+    def classifyBayesGausch(self, X_train, X_test, y_train, y_test):
 
         # The number of mixture components. Depending on the data and the value of the weight_concentration_prior the model can decide to not use all the components by setting some component weights_ to values very close to zero. The number of effective components is therefore smaller than n_components.
         n_components = 1
@@ -383,18 +384,18 @@ class Analyzer(object):
         clf = BayesianGaussianMixture(n_components=n_components, covariance_type=covariance_type, n_init=n_init, init_params=init_params)
 
         # training
-        clf.fit(input, label)
+        clf.fit(X_train, y_train)
 
         # testing
-        score = cross_val_score(clf, input, label, cv=5)
+        score = sclf.score(X_test, y_test)
 
-        print "BayesGausch-Classifier trained - with cross-val-scores: "
+        print "BayesGausch-Classifier trained - with accuracy score:"
         print "------------------------------------"
         print score
         print "------------------------------------"
         return clf
 
-    def classifyNaiveBayes(self, input, label):
+    def classifyNaiveBayes(self, X_train, X_test, y_train, y_test):
 
         # classifier
         clf = GaussianNB()
@@ -402,18 +403,18 @@ class Analyzer(object):
         #weight = np.full((len(X_train), 1), 10, dtype=np.int)
 
         # training
-        clf.fit(input, label)
+        clf.fit(X_train, y_train)
 
         # testing
-        score = cross_val_score(clf, input, label, cv=5)
+        score = clf.score(X_test, y_test)
         
-        print "NaiveBayes-Classifier trained - with cross-val-scores: "
+        print "NaiveBayes-Classifier trained - with accuracy score:"
         print "------------------------------------"
         print score
         print "------------------------------------"
         return clf
 
-    def classifySVC(self, input, label):
+    def classifySVC(self, X_train, X_test, y_train, y_test):
         
         self.cv = ShuffleSplit(n_splits=3, test_size=.25, random_state=0)
         
@@ -429,12 +430,12 @@ class Analyzer(object):
         # Use Test dataset and use cross validation to find bet hyper-parameters.
         clf = GridSearchCV(estimator=estimator, cv=self.cv,
                                   param_grid=dict(gamma=gammas))
-        clf.fit(input, label)
+        clf.fit(X_train, y_train)
 
         # Test final results with the testing dataset
-        score = cross_val_score(clf, input, label, cv=5)
+        score = clf.score(X_test, y_test)
 
-        print "SVM-Classifier trained - with cross-val-scores: "
+        print "SVM-Classifier trained - with accuracy score:"
         print "------------------------------------"
         print score
         print "------------------------------------"
