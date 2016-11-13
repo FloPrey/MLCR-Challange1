@@ -19,8 +19,6 @@ import math
 
 class Analyzer(object):
     
-    # pd.options.mode.chained_assignment = None
-    
     """Method that loads the datapoints from the repository and transfers them into lists and
     numpy arrays."""
     def loadData(self):
@@ -53,19 +51,24 @@ class Analyzer(object):
 
         # analyzer.improveData(percentage for ap occurence, set values <-85 to -85)
     
+    
+    """Method that splits the dataset into an initial training-and validation-set and one test-set."""
     def createSets(self):
         
+        # add output labels to the dataframe to make sure they are split in the same way
         self.dataset['floorLabel'] = self.floorLabels
         self.dataset['numericalFloorLabels'] = self.numericalFloorLabels
 
+        # split the dataset
         X_train, X_test, y_train, y_test = train_test_split(self.dataset, self.numerical_labels, test_size=0.1)
         
+        # copy the datasets to prevent misuse of further delete/add operations
         self.trainAndValidationSet = X_train.copy()
         self.testSet = X_test.copy()
         self.numericalLocationLabel_T = y_train.copy()
         self.numericalLocationLabel_Test = y_test.copy()
         
-        # test and evaluation labels
+        # train and evaluation labels
         self.floorLabel_T = self.trainAndValidationSet['floorLabel'].tolist()
         self.numericalFloorLabel_T = self.trainAndValidationSet['numericalFloorLabels'].tolist()
         
@@ -73,10 +76,11 @@ class Analyzer(object):
         self.floorLabel_Test = self.testSet['floorLabel'].tolist()
         self.numericalFloorLabel_Test = self.testSet['numericalFloorLabels'].tolist()
         
+        # delete labels from the original dataset
         self.trainAndValidationSet.drop(['floorLabel', 'numericalFloorLabels'], axis=1, inplace=True)
         self.testSet.drop(['floorLabel', 'numericalFloorLabels'], axis=1, inplace=True)
         
-    """Helper Method to change the String values of the floor string labels into numerical values."""    
+    """Helper Method to change the string values of the floor string labels into numerical values."""    
     def createNumericalFloorLabels(self, floorList):
         
         floorSet = list(set(floorList))
@@ -90,10 +94,15 @@ class Analyzer(object):
                 
         return floorList
 
+
+    """Helper method to get the difference between two lists."""
     def diff(self, first, second):
         second = set(second)
         return [item for item in first if item not in second]
 
+
+    """Method to optimize the data at hand. It loads already optimized data from a csv file if available.
+    Allows to load different kind of datasets with different optimization criteria. """
     def improveData(self, percentage_value, normalize):
 
         # ############################ STEP 0 #############################
@@ -197,6 +206,8 @@ class Analyzer(object):
             
             print "ERROR! Percentage_value hast to be betweeen 0 and 100."
 
+
+    """Helper method to split data into training and validation set."""
     def splitData(self, x_values, y_values):
         
         X_train, X_test, y_train, y_test = train_test_split(x_values, y_values, test_size=0.1)
@@ -210,11 +221,10 @@ class Analyzer(object):
         print "Starting training process for the Floor Prediction!"
         print "-------------------------------------------------------"
         
-        # train the chosen classifier
-        #classifier = self.classifyRandomForest(X_train, X_test, y_train, y_test)
+        # train the chosen classifier using the trainAndValidationSet
         classifier = self.classifyKNearest(self.trainAndValidationSet, self.floorLabel_T)
         
-        # perform the actual prediction using the test set
+        # perform the actual prediction using the test-set
         self.floorPrediction = classifier.predict(self.testSet)
         
         print "Test set evaluation:"
@@ -230,15 +240,14 @@ class Analyzer(object):
         
         
     """This method predicts the location of the previously loaded dataset. 
-    The dataset must also contain the floorLabels to increase accurracy. 
-    The original labels are added for the training process, however for the
-    prediction we use the previously predicted floors from the predictFloor method."""    
+    The original labels of the floors are added for the training process, however for the
+    prediction the previously predicted floors from the predictFloor method are used."""    
     def predictLocation(self):
         
         # add floor labels to the train and validation set for training/validation
         self.trainAndValidationSet['floorLabels'] = self.numericalFloorLabel_T
         
-        print "-------------------------------------------------------"
+        print "\n-------------------------------------------------------"
         print "Starting training process for the Location Prediction!"
         print "-------------------------------------------------------"
         
@@ -251,6 +260,7 @@ class Analyzer(object):
         # predict the locations using the test set, but with predicted labels instead
         self.locationPrediction = classifier.predict(self.testSet)
         
+        # calculate the error value in meter
         self.errorValue = self.calculateAverageLocationError()
         
         print "Average - error value of missclassified locations in meter:"
@@ -299,6 +309,7 @@ class Analyzer(object):
         return float(error / float(len(errorList)))
     
     
+    """Imlementation of the Random Forest classifier."""
     def classifyRandomForest(self, input, label):   
         
         estimators = 200
@@ -316,6 +327,8 @@ class Analyzer(object):
         
         return clf
 
+
+    """Implementation of the K-Nearest Neigbour classifier."""
     def classifyKNearest(self, input, label):
 
         # Anzahl an Nachbarn die verwendet werden.
@@ -347,6 +360,7 @@ class Analyzer(object):
         
         return clf
 
+    """Implementation of the Bayes Gausch classifier."""
     def classifyBayesGausch(self, input, label):
 
         # The number of mixture components. Depending on the data and the value of the weight_concentration_prior the model can decide to not use all the components by setting some component weights_ to values very close to zero. The number of effective components is therefore smaller than n_components.
@@ -378,6 +392,7 @@ class Analyzer(object):
         print "------------------------------------"
         return clf
 
+    """Implementation of the Naive Bayes classifier."""
     def classifyNaiveBayes(self, input, label):
 
         # classifier
@@ -397,6 +412,7 @@ class Analyzer(object):
         print "------------------------------------"
         return clf
 
+    """Implementation of the SVM classifier."""
     def classifySVC(self, input, label):
         
         self.cv = ShuffleSplit(n_splits=3, test_size=.25, random_state=0)
